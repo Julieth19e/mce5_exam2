@@ -67,6 +67,16 @@ Realice los siguientes análisis:
 Realizar los siguientes análisis y respectivas interpretaciones: 
 
 1. Análisis exploratorio.
+```{r}
+#GLM poisson
+library(readxl)
+glmaedes <- read_excel("glm.xlsx")
+summary(glmaedes)
+str(glmaedes)
+plot(glmaedes$repetition, glmaedes$aedes)
+
+```
+## En esta gráfica se puede visualizar 
 
 2. Planteamiento de hipótesis.
 
@@ -127,4 +137,30 @@ Seleccione una especie de planta y una especie de animal; asimismo, dos tipos de
 - Chirimoya: *Anona cherimola*
 
 Luego realice un análisis espacial de distribución de la especie en Ecuador continental en base a los datos de presencia del GBIF (use rgbif para descargar la data). Explique el resultado y compare la diferencia entre la salida de los dos modelos. En qué regiones los modelos difieren más en la predicción?   
+
+```{r}
+#Análisis Espacial (ANIMAL)
+library(rgbif)
+
+library(tidyverse)
+occ = occ_data(scientificName = 'Panthera onca', 
+                limit = 20000, 
+                hasCoordinate = TRUE, 
+                hasGeospatialIssue = FALSE)
+
+occ_ecu <- filter(occ$data, country == 'Ecuador')
+shp <- raster::getData('GADM', country = 'Ecu', level = 1)
+
+gg <- ggplot() +
+  geom_point(data = occ_ecu, aes(x = decimalLongitude, y = decimalLatitude), color = 'red') +
+  geom_polygon(data = shp, aes(x = long, y = lat, group = group), color = 'blue', fill = NA) +
+  coord_fixed(ylim = c(-5, 12), xlim = c(-80, -65)) +
+  xlab('Longitud') +
+  ylab('Latitud')
+
+ggsave(plot = gg, filename = 'Panthera onca.png', units = 'cm', width = 12, height = 16, dpi = 300)
+
+gg
+```
+#En esta gráfica se puede ver como existe un mayor número de especies distribuidas en la parte de la Región Amazoníca.
 
