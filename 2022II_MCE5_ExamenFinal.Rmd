@@ -203,6 +203,12 @@ gg
 
 ```
 #En esta gráfica se puede ver como noy hay ninguna especie en el Ecuador distribuida por ninguna región.
+
+
+
+
+
+Segundo modelo 
 ```{r}
 require(pacman)
 pacman::p_load(rnaturalearthdata, extrafont, showtext, rnaturalearth, cptcity, 
@@ -217,47 +223,6 @@ options(scipen = 999, warn = -1)
 sps = "Panthera onca"
 occr = occ_data(scientificName = sps, limit = 10e5, hasCoordinate = T, 
                 hasGeospatialIssue = F)
-
-# Selec datafrane from occr object and filter for a country
-occr = occr[[2]]
-unique(occr$country) %>%  sort()
-occr = occr %>%  dplyr::filter(country == "Ecuador")
-
-# Get shapefiles
-wrld = ne_countries(returnclass = "sf", scale = 50)
-ecu1 = geodata::gadm(country = "ECU", level = 1, path = "tmpr")
-
-# Exploratory maps 
-plot(st_geometry(wrld))
-plot(ecu1)
-points(occr$decimalLongitude, occr$decimalLatitude, pch = 16, col = "red")
-
-# climatic data 
-bioc = geodata::worldclim_country(country = "ECU", var = "bioc", path = "tmpr")
-bioc = terra::crop(bioc, ecu1) %>% terra::mask(., ecu1)
-names(bioc) = glue("bioc{1:19}")
-
-# Merge coordinates and bioclimatic data
-occr = occr %>%  dplyr::select(x = decimalLongitude, y = decimalLatitude)
-vles = terra::extract(bioc, occr[,c("x", "y")])
-occr = cbind(occr[,c("x", "y")], vles[,-1])
-occr = as_tibble(occr)
-occr = mutate(occr, pb = 1)
-
-# Generate backgroun 
-cell = terra::extract(bioc[[1]], occr[,1:2], cells=T)$cell
-duplicated(cell)
-mask = bioc[[1]]*0
-mask[cell] = NA
-back = terra::as.data.frame(mask, xy =T) %>% as_tibble()
-back = sample_n(back, size = nrow(occr)*2, replace = FALSE)
-colnames(back)[3] = "pb"
-back = mutate(back, pb = 0)
-back = cbind(back, terra::extract(bioc, back[,c(1,2)])[,-1])
-back = as_tibble(back)
-
-# Join data 
-tble = rbind(occr, back)
 
 # Random Forest Model
 bioc = stack(bioc)
