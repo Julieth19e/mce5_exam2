@@ -114,10 +114,19 @@ Realizar los siguientes análisis y respectivas interpretaciones:
 4. Predicción a 20 años o a 24 meses según corresponda. 
 
 ```{r}
-
+#Analisis exploratorio
+summary (ts)
+plot (ts)
+#Autocorrelación
+ts[is.na(ts)]=0
+acf_enf=acf(ts, lag.max = 5,plot=F)
+head(acf_enf,5)
 
 ```
-
+##Análisis exploratorio 
+En este apartado tenemos los años respectivamente con los terremotos suscitados teniendo un valor maximo de 24 y para los de 1 quartil 9.00  mientras que en el 3 quartil un incremento de  15.25 
+##Autocorrelación 
+Se puede visualizar como los valores son estacionales favorablemente a media que pasan los años.
 
 ## **PREGUNTA 3: Análisis espacial de especies [3 PUNTOS]**
 
