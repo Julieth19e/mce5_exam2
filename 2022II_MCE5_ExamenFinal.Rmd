@@ -76,10 +76,11 @@ str(glmaedes)
 plot(glmaedes$repetition, glmaedes$aedes)
 
 ```
-## En esta gráfica se puede visualizar 
+## En este apartado se puede visualizar tanto los valores minimos, maximos, media y mediana en cuanto al modelo de gml (poisson), de igual forma se puede ver su diferencia significativa tanto en el 3 quartil para aedes como se incrementa a un 1217.8 y el valor maximo a un 3020.0. En la grafica se puede corrrobar esto como los valores del aedes mucho mucho mayor que los de aedes de repetition.
 
 2. Planteamiento de hipótesis.
-
+#HO: Los insecticidas no estan controlando de manera factible a los zancudos haciendo que estos resistan al químico.
+#H1: Los insecticidas estan controlando de manera siginificativa el cual conlleva a un control apropiado en los mosquitos "zancudos" haciendolos disminuir.
 3. Análisis de regresión 
 
 4. Planteamiento del modelo. 
@@ -112,6 +113,10 @@ Realizar los siguientes análisis y respectivas interpretaciones:
 
 4. Predicción a 20 años o a 24 meses según corresponda. 
 
+```{r}
+
+
+```
 
 
 ## **PREGUNTA 3: Análisis espacial de especies [3 PUNTOS]**
@@ -144,7 +149,7 @@ library(rgbif)
 
 library(tidyverse)
 occ = occ_data(scientificName = 'Panthera onca', 
-                limit = 20000, 
+                limit = 200000, 
                 hasCoordinate = TRUE, 
                 hasGeospatialIssue = FALSE)
 
@@ -154,13 +159,148 @@ shp <- raster::getData('GADM', country = 'Ecu', level = 1)
 gg <- ggplot() +
   geom_point(data = occ_ecu, aes(x = decimalLongitude, y = decimalLatitude), color = 'red') +
   geom_polygon(data = shp, aes(x = long, y = lat, group = group), color = 'blue', fill = NA) +
-  coord_fixed(ylim = c(-5, 12), xlim = c(-80, -65)) +
+  coord_fixed(ylim = c(-4, 11), xlim = c(-80, -65)) +
   xlab('Longitud') +
   ylab('Latitud')
 
-ggsave(plot = gg, filename = 'Panthera onca.png', units = 'cm', width = 12, height = 16, dpi = 300)
+ggsave(plot = gg, filename = 'Panthera onca.png', units = 'cm', width = 12, height = 19, dpi = 300)
 
 gg
 ```
 #En esta gráfica se puede ver como existe un mayor número de especies distribuidas en la parte de la Región Amazoníca.
+
+```{r}
+#Análisis Espacial (PLANTA)
+library(rgbif)
+library(tidyverse)
+library(geodaData)
+occ = occ_data(scientificName = 'Ceroxylon quindiuense', 
+                limit = 2000, 
+                hasCoordinate = TRUE, 
+                hasGeospatialIssue = FALSE)
+
+occ_ecu <- filter(occ$data, country == 'Ecuador')
+shp <- raster::getData('GADM', country = 'Ecu', level = 1)
+
+gg <- ggplot() +
+  geom_point(data = occ_ecu, aes(x = decimalLongitude, y = decimalLatitude), color = 'yellow') +
+  geom_polygon(data = shp, aes(x = long, y = lat, group = group), color = 'red', fill = NA) +
+  coord_fixed(ylim = c(-6, 15), xlim = c(-88, -75)) +
+  xlab('Longitud') +
+  ylab('Latitud')
+ggsave(plot = gg, filename = 'Ceroxylon quindiuense.png', units = 'cm', width = 12, height = 19, dpi = 300)
+
+gg
+
+```
+#En esta gráfica se puede ver como noy hay ninguna especie en el Ecuador distribuida por ninguna región.
+```{r}
+require(pacman)
+pacman::p_load(rnaturalearthdata, extrafont, showtext, rnaturalearth, cptcity, 
+               SSDM, ggspatial, raster, terra, rgbif, tidyverse, sf, sp, 
+               geodata, glue, ggpubr)
+
+g = gc(reset=T)
+rm(list=ls())
+options(scipen = 999, warn = -1)
+
+# load data 
+sps = "Panthera onca"
+occr = occ_data(scientificName = sps, limit = 10e5, hasCoordinate = T, 
+                hasGeospatialIssue = F)
+
+# Selec datafrane from occr object and filter for a country
+occr = occr[[2]]
+unique(occr$country) %>%  sort()
+occr = occr %>%  dplyr::filter(country == "Ecuador")
+
+# Get shapefiles
+wrld = ne_countries(returnclass = "sf", scale = 50)
+ecu1 = geodata::gadm(country = "ECU", level = 1, path = "tmpr")
+
+# Exploratory maps 
+plot(st_geometry(wrld))
+plot(ecu1)
+points(occr$decimalLongitude, occr$decimalLatitude, pch = 16, col = "red")
+
+# climatic data 
+bioc = geodata::worldclim_country(country = "ECU", var = "bioc", path = "tmpr")
+bioc = terra::crop(bioc, ecu1) %>% terra::mask(., ecu1)
+names(bioc) = glue("bioc{1:19}")
+
+# Merge coordinates and bioclimatic data
+occr = occr %>%  dplyr::select(x = decimalLongitude, y = decimalLatitude)
+vles = terra::extract(bioc, occr[,c("x", "y")])
+occr = cbind(occr[,c("x", "y")], vles[,-1])
+occr = as_tibble(occr)
+occr = mutate(occr, pb = 1)
+
+# Generate backgroun 
+cell = terra::extract(bioc[[1]], occr[,1:2], cells=T)$cell
+duplicated(cell)
+mask = bioc[[1]]*0
+mask[cell] = NA
+back = terra::as.data.frame(mask, xy =T) %>% as_tibble()
+back = sample_n(back, size = nrow(occr)*2, replace = FALSE)
+colnames(back)[3] = "pb"
+back = mutate(back, pb = 0)
+back = cbind(back, terra::extract(bioc, back[,c(1,2)])[,-1])
+back = as_tibble(back)
+
+# Join data 
+tble = rbind(occr, back)
+
+# Random Forest Model
+bioc = stack(bioc)
+tble = as.data.frame(tble)
+
+srdf = modelling (algorithm = "RF", Env = bioc, Occurrences = tble, Pcol = "pb", 
+                 Xcol = "x", cv.parm = c(0.75, 0.25), 
+                 Ycol = "y", metric = "TSS", select.metric = "AUC")
+plot(srdf@projection)
+plot(srdf@binary)
+srdf@parameters
+srdf@name
+srdf@variable.importance
+as.numeric(srdf@variable.importance) %>% sum()
+
+rstr = srdf@projection
+rstr = terra::rast(rstr)
+rslt = terra::as.data.frame(rstr, xy = T) %>%  as_tibble()
+
+# Built the map
+windowsFont(georg = windowsFont("Georgia"))
+
+gmap = ggplot() +
+  geom_tile(data = rslt, aes(x = x, y = y, fill = Projection)) +
+  scale_fill_gradientn(colors = cpt(pal = "mpl_inferno", n=10, rev = TRUE)) +
+  geom_sf(data = wrld, fill = NA, col = "grey40", lwd=0.1) +
+  geom_sf(data = st_as_sf(ecu1), fill = NA, col = "grey40", lwd=0.3) +
+  coord_sf(xlim = ext(ecu1)[1:2], ylim = ext(ecu1)[3:4]) +
+  labs(x = "Longitud", y = "Latitud", fill = "Puntaje de Idoneidad") +
+  ggtitle(label = "Idoneidad para Panthera onca. en Ecuador", subtitle = "Modelo Random Forest") +
+  theme_bw() + 
+  theme(text = element_text(family="georg", color = "grey50"), 
+        legend.position = "bottom", 
+        plot.title = element_text(hjust = 0.5, face = "bold", color ="grey30"),
+        plot.subtitle = element_text(hjust = 0.5, face = "bold", color ="grey30"),
+        panel.border = element_rect(color = "grey80") ) +
+  guides(fill = guide_legend(
+    direction = "horizontal", 
+    keyheight = unit(1.15, units = "mm"), keywidth = unit(1.15, units = "mm"),
+    title.position = "top", title.hjust = 0.5, label.hjust = 0.5, 
+    nrow = 1, byrow = T, reverse = F, label.position = "bottom")) +
+  annotation_scale(location="bl", width_hint =0.5, text_family = "georg", 
+                   text_col = "grey60", text_cex = 0.7 ) +
+  annotation_north_arrow(
+    location= "tr", which_north = "true",
+    pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in"),
+    style = north_arrow_fancy_orienteering(text_family = "georg", text_col = "grey40"))
+
+setwd("D:/GDrive2/My Drive/IKIAM/CLASES/2022II/MCE5/clases/2021II_RSpatial")
+ggsave(plot = gmap, filename="Panthera onca_rf_ecu.png", units="in", 
+       width = 9, height = 7, dpi = 300)
+
+```
+
 
